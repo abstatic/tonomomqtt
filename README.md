@@ -12,3 +12,8 @@
     - `mosquitto_pub -t temperature_meter/{} -f ./data`
     - `python main.py`
     - `mosquitto_sub -t temperature_meter/#`
+
+#### Could be better
+
+    - tests for outlier detection
+    - Mocking of broker

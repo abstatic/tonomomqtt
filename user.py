@@ -17,7 +17,7 @@ class UserData:
 
         log.info(f"Initialized userdata for user {user_id}")
 
-    def add_temp_reading(self, reading):
+    def add_temp_reading(self, reading, simulate=False):
         log.debug("Adding temperature reading")
 
         # check the Z-Score and then add/drop the readings.
@@ -26,7 +26,7 @@ class UserData:
             self.temps.append(reading)
         else:
             self.temps.append(reading)
-            if self.is_outlier():
+            if not simulate and self.is_outlier():
                 log.info(f"Outlier detected {reading}")
                 self.temps.pop()
                 return False, None

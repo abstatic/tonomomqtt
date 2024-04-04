@@ -2,8 +2,12 @@
 import json
 import logging as log
 import time
+import unittest
 
 import paho.mqtt.client as mqtt
+
+from client import MQTTClient
+from user import UserData
 
 log.basicConfig(
     format="%(asctime)s %(name)-12s %(levelname)-8s %(message)s",
@@ -36,12 +40,43 @@ def test_simulate_temp_sensors(broker_url, port=1883):
             time.sleep(1)
 
 
-def test_simulate():
-    """
-    prints all the messages present in mqtt
-    :return:
-    """
+class TestHeatingSystem(unittest.TestCase):
+
+    def setUp(self):
+        # Initialize MQTTClient with mock broker URL, port, and a test threshold
+        self.mqtt_client = MQTTClient("localhost", 1883, 15)
+
+        # Add a test user
+        self.user_id = "user1"
+        self.mqtt_client.data_state[self.user_id] = UserData(
+            self.user_id, self.mqtt_client.temp_thresh
+        )
+
+    def test_heating_turned_on_when_cold(self):
+        # Simulate receiving cold temperature readings below the threshold
+        for temp in [10] * 100:
+            self.mqtt_client.data_state[self.user_id].add_temp_reading(temp)
+
+        self.assertTrue(
+            self.mqtt_client.data_state[self.user_id].heater_state,
+            "Heater should be turned on for cold temperatures",
+        )
+
+    def test_heating_turned_off_when_warm(self):
+        # First, simulate the heater being turned on by cold temperatures
+        for temp in [10] * 100:  # Cold temperatures
+            self.mqtt_client.data_state[self.user_id].add_temp_reading(temp, True)
+
+        # Then, simulate receiving warm temperature readings above the threshold
+        for temp in [20] * 100:  # Warm temperatures
+            self.mqtt_client.data_state[self.user_id].add_temp_reading(temp, True)
+
+        self.assertFalse(
+            self.mqtt_client.data_state[self.user_id].heater_state,
+            "Heater should be turned off for warm temperatures",
+        )
 
 
 if __name__ == "__main__":
-    test_simulate_temp_sensors("localhost", 1883)
+    unittest.main()
+    # test_simulate_temp_sensors("localhost", 1883)
