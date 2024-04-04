@@ -1,40 +1,13 @@
-import paho.mqtt.client as mqtt
-from collections import defaultdict
 import json
 import logging as log
+import traceback
+from typing import Dict
 
+import paho.mqtt.client as mqtt
 
-class UserData:
-    def __init__(self, user_id, temp_thresh, thermostat_control):
-        self.user_id = user_id
-        self.temps = []
-        self.heater_state = False
-        self.temp_thresh = temp_thresh
+from user import UserData
 
-        # callback function to turn on the heat
-        self.thermostat_control = thermostat_control
-
-    def calculate_heater_state(self):
-        data_subset = self.temps[-100:]
-
-        heater_state = True
-        for reading in data_subset:
-            # if any reading is greater than temp thresh then we don't turn the heater on
-            # TODO find a better way of doing this
-            if reading > self.temp_thresh:
-                heater_state = False
-
-        # turn the heater on
-        self.thermostat_control(heater_state, self.user_id)
-
-    def add_temp_reading(self, reading):
-        # check the Z-Score and then add/drop the readings.
-        # NA for first 100
-        if len(self.temps) <= 100:
-            self.temps.append(reading)
-        else:
-            # calculate the Z-Score
-            pass
+log = log.getLogger(__name__)
 
 
 class MQTTClient:
@@ -46,16 +19,18 @@ class MQTTClient:
     stores state (offset), heating settings, temperature records last 500 readings ono a per user basis in a dict
     """
 
-    data_state = defaultdict()
+    data_state: Dict[str, UserData] = {}
 
     def __init__(self, broker_url, port, temp_thresh):
         """
         create a mqtt client and do a ".loop_start()"
         """
-        self.client = mqtt.Client()
-        self.client.on_connect = self.on_connect
-        self.client.on_message = self.on_message
-        self.client.on_publish = self.on_publish
+        self.offset = 0
+        self.mqtt_client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION1)
+        self.mqtt_client.on_connect = self.on_connect
+        self.mqtt_client.on_message = self.on_message
+        self.mqtt_client.on_subscribe = self.on_subscribe
+        self.mqtt_client.on_publish = self.on_publish
 
         # self.client.on_disconnect
         # self.client.on_subscribe
@@ -63,9 +38,10 @@ class MQTTClient:
         self.temp_thresh = temp_thresh
 
         try:
-            self.client.connect(broker_url, port)
+            self.mqtt_client.connect(broker_url, port)
         except Exception as e:
             log.error(f"Failed to create mqtt client {e}")
+            traceback.print_exc()
 
     def on_connect(self, client, obj, flags, rc):
         """
@@ -73,42 +49,59 @@ class MQTTClient:
         :return:
         """
         log.info("Connected to broker. Subscribing to topics")
-        self.client.subscribe("temperature_meter/#", qos=2)
+        self.mqtt_client.subscribe("temperature_meter/#", qos=2)
+
+    def on_subscribe(self, client, userdata, mid, reason_code_list):
+        log.info("Subbed")
 
     def on_message(self, client, userdata, message):
         """
         on getting a message do this
         :return:
         """
-        print(f"I received a message {message}")
-        print("message received ", str(message.payload.decode("utf-8")))
-        print("message topic=", message.topic)
-        print("message qos=", message.qos)
-        print("message retain flag=", message.retain)
+        log.debug(
+            f"message received topic: {message.topic} for {str(message.payload.decode('utf-8'))}"
+        )
 
+        try:
+            # process the message and take actions if needed
+            if str(message.topic).startswith("temperature_meter"):
+                user_id = message.topic.split("/")[-1]
+                message_dict = json.loads(message.payload.decode("utf-8"))
+                temp_reading = float(message_dict["temperature"])
 
-        # process the message and take actions if needed
-        user_id = message.topic.split("/")[-1]
-        message_dict = json.loads(message.payload.decode("utf-8"))
+                if user_id not in self.data_state:
+                    self.data_state[user_id] = UserData(user_id, self.temp_thresh, self.switch_heat)
+                user = self.data_state[user_id]
 
+                action_required, action = user.add_temp_reading(temp_reading)
+                if action_required:
+                    control_topic = f"heating_system/{user_id}/control"
+                    self.mqtt_client.publish(control_topic, json.dumps({"action": action}))
+                    log.info(f"Published '{action}' to {control_topic}")
+                # user.add_temp_reading(temp_reading)
+        except Exception as e:
+            log.error(f"Failed in processing message {e}")
+            traceback.print_exc()
 
     def on_publish(self, client, userdata, message):
-        print("Published the message")
-        print(message.topic)
+        log.info(f"Published")
 
-
-    def switch_heat(self, switch: bool, user_id: str):
+    def switch_heat(self, switch: str, user_id: str):
         """
         :param switch: state for the thermostat, False-> off True -> On
         :param user_id: user_id for which to take action
         :return: Nothing.
         """
-        if not switch:
+        if switch == "off":
             action = "turn_off"
         else:
             action = "turn_on"
-        payload = {
-            "action": action
-        }
-        self.client.publish(f"heating_system/{user_id}/control", json.dumps(payload), qos=2, retain=True)
 
+        payload = {"action": action}
+        log.info(
+            f"Publishing to heating_system/{user_id}/control , payload: {json.dumps(payload)}"
+        )
+        self.mqtt_client.publish(
+            f"heating_system/{user_id}/control", json.dumps(payload), qos=2, retain=True
+        )
