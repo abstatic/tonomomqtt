@@ -54,7 +54,7 @@ class TestHeatingSystem(unittest.TestCase):
 
     def test_heating_turned_on_when_cold(self):
         # Simulate receiving cold temperature readings below the threshold
-        for temp in [10] * 100:
+        for temp in [10] * 300:
             self.mqtt_client.data_state[self.user_id].add_temp_reading(temp)
 
         self.assertTrue(
@@ -62,13 +62,24 @@ class TestHeatingSystem(unittest.TestCase):
             "Heater should be turned on for cold temperatures",
         )
 
+    def test_outlier_detection(self):
+        for temp in [20] * 300:
+            self.mqtt_client.data_state[self.user_id].add_temp_reading(temp)
+        before_len = len(self.mqtt_client.data_state[self.user_id].temps)
+
+        for temp in [100] * 300:
+            self.mqtt_client.data_state[self.user_id].add_temp_reading(temp)
+        after_len = len(self.mqtt_client.data_state[self.user_id].temps)
+
+        self.assertEqual(before_len, after_len)
+
     def test_heating_turned_off_when_warm(self):
         # First, simulate the heater being turned on by cold temperatures
-        for temp in [10] * 100:  # Cold temperatures
+        for temp in [10] * 300:  # Cold temperatures
             self.mqtt_client.data_state[self.user_id].add_temp_reading(temp, True)
 
         # Then, simulate receiving warm temperature readings above the threshold
-        for temp in [20] * 100:  # Warm temperatures
+        for temp in [20] * 300:  # Warm temperatures
             self.mqtt_client.data_state[self.user_id].add_temp_reading(temp, True)
 
         self.assertFalse(

@@ -12,6 +12,7 @@
 * `test_simulate_temp_sensors` method is for quick simulation, with 1sec sleep
 * Unittest cases for checking heater state for user
 * Testing requires a live broker. Broker is not mocked
+* Test cases are affected by value of OFFSET and STEP_SIZE
 
 
 - Useful Commands
