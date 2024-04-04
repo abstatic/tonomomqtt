@@ -1,8 +1,8 @@
 # tests the module
 import paho.mqtt.client as mqtt
 
-# drop the outliers
 
+# drop the outliers
 def test_simulate_temp_sensors(broker_url, port=1883):
     """
     given a broker url, we simulate 5 temp sensors
@@ -23,7 +23,7 @@ def test_simulate_temp_sensors(broker_url, port=1883):
             client.publish(topic_name, temp_sample)
 
 
-def test_get_all_messages():
+def test_simulate():
     """
     prints all the messages present in mqtt
     :return:
