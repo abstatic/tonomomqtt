@@ -71,9 +71,7 @@ class MQTTClient:
                 temp_reading = float(message_dict["temperature"])
 
                 if user_id not in self.data_state:
-                    self.data_state[user_id] = UserData(
-                        user_id, self.temp_thresh, self.switch_heat
-                    )
+                    self.data_state[user_id] = UserData(user_id, self.temp_thresh)
                 user = self.data_state[user_id]
 
                 action_required, action = user.add_temp_reading(temp_reading)
@@ -90,22 +88,3 @@ class MQTTClient:
 
     def on_publish(self, client, userdata, message):
         pass
-
-    def switch_heat(self, switch: str, user_id: str):
-        """
-        :param switch: state for the thermostat, False-> off True -> On
-        :param user_id: user_id for which to take action
-        :return: Nothing.
-        """
-        if switch == "off":
-            action = "turn_off"
-        else:
-            action = "turn_on"
-
-        payload = {"action": action}
-        log.info(
-            f"Publishing to heating_system/{user_id}/control , payload: {json.dumps(payload)}"
-        )
-        self.mqtt_client.publish(
-            f"heating_system/{user_id}/control", json.dumps(payload), qos=2, retain=True
-        )
