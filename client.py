@@ -4,6 +4,39 @@ import json
 import logging as log
 
 
+class UserData:
+    def __init__(self, user_id, temp_thresh, thermostat_control):
+        self.user_id = user_id
+        self.temps = []
+        self.heater_state = False
+        self.temp_thresh = temp_thresh
+
+        # callback function to turn on the heat
+        self.thermostat_control = thermostat_control
+
+    def calculate_heater_state(self):
+        data_subset = self.temps[-100:]
+
+        heater_state = True
+        for reading in data_subset:
+            # if any reading is greater than temp thresh then we don't turn the heater on
+            # TODO find a better way of doing this
+            if reading > self.temp_thresh:
+                heater_state = False
+
+        # turn the heater on
+        self.thermostat_control(heater_state, self.user_id)
+
+    def add_temp_reading(self, reading):
+        # check the Z-Score and then add/drop the readings.
+        # NA for first 100
+        if len(self.temps) <= 100:
+            self.temps.append(reading)
+        else:
+            # calculate the Z-Score
+            pass
+
+
 class MQTTClient:
     """
     MQTT client which turns the heat on based on temperature sensor readings
@@ -53,11 +86,18 @@ class MQTTClient:
         print("message qos=", message.qos)
         print("message retain flag=", message.retain)
 
+
+        # process the message and take actions if needed
+        user_id = message.topic.split("/")[-1]
+        message_dict = json.loads(message.payload.decode("utf-8"))
+
+
     def on_publish(self, client, userdata, message):
         print("Published the message")
         print(message.topic)
 
-    def switch_heat(self, switch: bool, user_id: int):
+
+    def switch_heat(self, switch: bool, user_id: str):
         """
         :param switch: state for the thermostat, False-> off True -> On
         :param user_id: user_id for which to take action
