@@ -35,7 +35,7 @@ class MQTTClient:
         # self.client.on_disconnect
         # self.client.on_subscribe
 
-        self.temp_thresh = temp_thresh
+        self.temp_thresh = float(temp_thresh)
 
         try:
             self.mqtt_client.connect(broker_url, port)
@@ -71,21 +71,25 @@ class MQTTClient:
                 temp_reading = float(message_dict["temperature"])
 
                 if user_id not in self.data_state:
-                    self.data_state[user_id] = UserData(user_id, self.temp_thresh, self.switch_heat)
+                    self.data_state[user_id] = UserData(
+                        user_id, self.temp_thresh, self.switch_heat
+                    )
                 user = self.data_state[user_id]
 
                 action_required, action = user.add_temp_reading(temp_reading)
                 if action_required:
-                    control_topic = f"heating_system/{user_id}/control"
-                    self.mqtt_client.publish(control_topic, json.dumps({"action": action}))
-                    log.info(f"Published '{action}' to {control_topic}")
+                    heater_control = f"heating_system/{user_id}/control"
+                    self.mqtt_client.publish(
+                        heater_control, json.dumps({"action": action})
+                    )
+                    log.info(f"Published '{action}' to {heater_control}")
                 # user.add_temp_reading(temp_reading)
         except Exception as e:
             log.error(f"Failed in processing message {e}")
             traceback.print_exc()
 
     def on_publish(self, client, userdata, message):
-        log.info(f"Published")
+        pass
 
     def switch_heat(self, switch: str, user_id: str):
         """

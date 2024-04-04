@@ -26,7 +26,7 @@ def test_simulate_temp_sensors(broker_url, port=1883):
         for j in range(2):
             topic_name = f"temperature_meter/user{j}"
             if i <= 300:
-                temp_sample = 30 - (i // 10) - (j // 10)
+                temp_sample = 20 - (i // 10) - (j // 10)
             else:
                 temp_sample = -10 + (i // 10) - (j // 10)
             log.info(f"{k} publishing to {topic_name} {temp_sample}")

@@ -10,7 +10,9 @@ def main(broker_url, port, temp_thresh):
         format="%(asctime)s %(name)-12s %(levelname)-8s %(message)s",
         level=logging.INFO,
     )
-    logging.info(f"Starting client with offset: {OFFSET} and step size: {STEP_SIZE}")
+    logging.info(
+        f"Starting client with offset: {OFFSET} and step size: {STEP_SIZE} temp thres {temp_thresh}"
+    )
     client = MQTTClient(broker_url, port, temp_thresh)
     client.mqtt_client.loop_forever()
 

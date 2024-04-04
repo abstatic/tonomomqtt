@@ -1,4 +1,6 @@
 import logging as log
+
+import numpy as np
 from scipy.stats import zscore
 
 from utils import STEP_SIZE, OFFSET
@@ -10,7 +12,7 @@ class UserData:
     def __init__(self, user_id, temp_thresh, thermostat_control):
         self.user_id = user_id
         self.temps = []
-        self.heater_state = "off"
+        self.heater_state = False
         self.temp_thresh = temp_thresh
 
         # callback function to turn on the heat
@@ -54,23 +56,37 @@ class UserData:
 
     def add_temp_reading(self, reading):
         log.debug("Adding temperature reading")
+
         # check the Z-Score and then add/drop the readings.
         # NA for first 100
-        if len(self.temps) <= OFFSET:
+        if len(self.temps) < OFFSET:
             self.temps.append(reading)
         else:
-            if not
-            # calculate the Z-Score
-            # for valid z-score
             self.temps.append(reading)
+            if self.is_outlier():
+                log.info(f"Outlier detected {reading}")
+                self.temps.pop()
+                return False, None
 
-            # use a fixed window size to calculate heater state
-            if len(self.temps) % STEP_SIZE == 0:
-                self.calculate_heater_state()
+            if (
+                np.mean(self.temps[-STEP_SIZE:]) < self.temp_thresh
+                and not self.heater_state
+            ):
+                log.info("Turning the heater on")
+                self.heater_state = True
+                return True, "turn_on"
+            elif (
+                np.mean(self.temps[-STEP_SIZE:]) >= self.temp_thresh
+                and self.heater_state
+            ):
+                self.heater_state = False
+                return True, "turn_off"
 
-    def is_outlier(self, temp):
+        return False, None
+
+    def is_outlier(self):
         # Apply Z-score for outlier detection
-        if len(self.temperatures) < 2:
+        if len(self.temps) < 2:
             return False
-        zs = zscore(self.temperatures)
+        zs = zscore(self.temps)
         return abs(zs[-1]) > 3
